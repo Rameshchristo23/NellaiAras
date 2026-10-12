@@ -20,13 +20,14 @@ type AppShellProps = {
   onDismissNotice: () => void;
 };
 
-const pages: AppPage[] = ["dashboard", "inventory", "sales", "customers", "attendance"];
+const pages: AppPage[] = ["dashboard", "inventory", "rawMaterials", "sales", "customers", "attendance"];
 
 function NavIcon({ page }: { page: AppPage }) {
   const shared = { fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
   const paths: Record<AppPage, ReactNode> = {
     dashboard: <><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="4.5" rx="1.5"/><rect x="13.5" y="10" width="7" height="10.5" rx="1.5"/><rect x="3.5" y="13" width="7" height="7.5" rx="1.5"/></>,
     inventory: <><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z"/><path d="m4.5 7.5 7.5 4 7.5-4M12 12v9"/></>,
+    rawMaterials: <><path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h8.7a2 2 0 0 0 1.9-1.4L22 8H6"/><path d="M10 20h.01M18 20h.01"/></>,
     sales: <><path d="M4 19V5M4 19h16"/><path d="m7 15 4-4 3 2 5-6"/></>,
     customers: <><path d="M16 20v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V20"/><circle cx="9.5" cy="7" r="4"/><path d="M17 11a4 4 0 0 0 0-8M21 20v-1.5a4 4 0 0 0-3-3.87"/></>,
     attendance: <><rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M7.5 3v4M16.5 3v4M3.5 10h17M8 15l2.5 2.5L16 12"/></>,

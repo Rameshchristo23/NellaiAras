@@ -8,6 +8,14 @@ export type Product = {
   low_stock_threshold: number;
 };
 
+export type RawMaterial = {
+  id: string;
+  name: string;
+  quantity: number;
+  unit: "kg" | "units";
+  low_stock_threshold: number;
+};
+
 export type Sale = {
   id: string;
   product_id: string;
@@ -27,5 +35,5 @@ export type Employee = { id: string; name: string; daily_wage: number; active: b
 export type Attendance = { id: string; employee_id: string; work_date: string; status: "present" | "half_day" | "absent"; employee?: Employee };
 export type SalaryPayment = { id: string; employee_id: string; work_month: string; amount: number; paid_at: string };
 
-export type AppPage = "dashboard" | "inventory" | "sales" | "customers" | "attendance";
+export type AppPage = "dashboard" | "inventory" | "rawMaterials" | "sales" | "customers" | "attendance";
 export type Language = "en" | "ta";

@@ -12,7 +12,8 @@ import { InventoryView } from "@/components/views/InventoryView";
 import { SalesView } from "@/components/views/SalesView";
 import { CustomersView } from "@/components/views/CustomersView";
 import { AttendanceView } from "@/components/views/AttendanceView";
-import type { Attendance, Customer, CustomerOrder, Employee, Product, Sale, SalaryPayment, AppPage as Page } from "@/lib/models";
+import { RawMaterialsView } from "@/components/views/RawMaterialsView";
+import type { Attendance, Customer, CustomerOrder, Employee, Product, RawMaterial, Sale, SalaryPayment, AppPage as Page } from "@/lib/models";
 
 function localDate() { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`; }
 
@@ -36,6 +37,7 @@ export default function Home() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [salaryPayments, setSalaryPayments] = useState<SalaryPayment[]>([]);
+  const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
   const [attendanceDate, setAttendanceDate] = useState(() => localDate());
   const [filterCustomer, setFilterCustomer] = useState("");
   const [from, setFrom] = useState("");
@@ -50,8 +52,8 @@ export default function Home() {
     if(!supabase||!user)return;
     setLoading(true);setError("");
     const month=attendanceDate.slice(0,7), monthEnd=`${month}-${String(new Date(Number(month.slice(0,4)),Number(month.slice(5,7)),0).getDate()).padStart(2,"0")}`, attendanceEnd=month===localDate().slice(0,7)?localDate():monthEnd;
-    const [p,s,o,c,e,a,pay]=await Promise.all([supabase.from("products").select("id,name,category,stock,unit,price,low_stock_threshold").order("name"),supabase.from("sales").select("id,product_id,product_name,quantity,unit_price,total,customer_name,created_at,order_id").order("created_at",{ascending:false}),supabase.from("customer_orders").select("id,customer_name,total,amount_paid,created_at").order("created_at",{ascending:false}),supabase.from("customers").select("id,name").order("name"),supabase.from("employees").select("id,name,daily_wage,active").order("name"),supabase.from("attendance").select("id,employee_id,work_date,status").gte("work_date",`${month}-01`).lte("work_date",attendanceEnd),supabase.from("salary_payments").select("id,employee_id,work_month,amount,paid_at").eq("work_month",`${month}-01`)]);
-    if(p.error||s.error||o.error||c.error||e.error||a.error||pay.error)setError((p.error||s.error||o.error||c.error||e.error||a.error||pay.error)?.message||"Could not load data.");else{setProducts((p.data||[]) as Product[]);setSales((s.data||[]) as Sale[]);setOrders((o.data||[]) as CustomerOrder[]);setSavedCustomers((c.data||[]) as Customer[]);setEmployees((e.data||[]) as Employee[]);setAttendance((a.data||[]) as Attendance[]);setSalaryPayments((pay.data||[]) as SalaryPayment[]);}setLoading(false);
+    const [p,s,o,c,e,a,pay,m]=await Promise.all([supabase.from("products").select("id,name,category,stock,unit,price,low_stock_threshold").order("name"),supabase.from("sales").select("id,product_id,product_name,quantity,unit_price,total,customer_name,created_at,order_id").order("created_at",{ascending:false}),supabase.from("customer_orders").select("id,customer_name,total,amount_paid,created_at").order("created_at",{ascending:false}),supabase.from("customers").select("id,name").order("name"),supabase.from("employees").select("id,name,daily_wage,active").order("name"),supabase.from("attendance").select("id,employee_id,work_date,status").gte("work_date",`${month}-01`).lte("work_date",attendanceEnd),supabase.from("salary_payments").select("id,employee_id,work_month,amount,paid_at").eq("work_month",`${month}-01`),supabase.from("raw_materials").select("id,name,quantity,unit,low_stock_threshold").order("name")]);
+    if(p.error||s.error||o.error||c.error||e.error||a.error||pay.error||m.error)setError((p.error||s.error||o.error||c.error||e.error||a.error||pay.error||m.error)?.message||"Could not load data.");else{setProducts((p.data||[]) as Product[]);setSales((s.data||[]) as Sale[]);setOrders((o.data||[]) as CustomerOrder[]);setSavedCustomers((c.data||[]) as Customer[]);setEmployees((e.data||[]) as Employee[]);setAttendance((a.data||[]) as Attendance[]);setSalaryPayments((pay.data||[]) as SalaryPayment[]);setRawMaterials((m.data||[]) as RawMaterial[]);}setLoading(false);
   },[supabase,user,attendanceDate]);
   useEffect(()=>{void refresh();},[refresh]);
 
@@ -72,6 +74,9 @@ export default function Home() {
   async function markSalaryPaid(employeeId:string,amount:number){if(!supabase||amount<=0)return;setBusy(true);const {error}=await supabase.from("salary_payments").insert({employee_id:employeeId,work_month:`${attendanceDate.slice(0,7)}-01`,amount});setBusy(false);if(error)setError(error.message);else{setNotice("Salary marked as paid.");await refresh();}}
   async function updateOrderPayment(orderId:string,amount:number):Promise<boolean>{if(!supabase||!Number.isFinite(amount)||amount<0)return false;const order=orders.find(row=>row.id===orderId);if(!order||amount>Number(order.total)){setError("Paid amount must be between zero and the order total.");return false;}setBusy(true);const {error}=await supabase.from("customer_orders").update({amount_paid:amount}).eq("id",orderId);setBusy(false);if(error){setError(error.message);return false;}setNotice(w.saved);await refresh();return true;}
   async function addCustomer(name:string){if(!supabase||!name)return;if(customers.some(([,existing])=>existing.toLocaleLowerCase()===name.toLocaleLowerCase())){setError("That customer already exists.");return;}setBusy(true);const {error}=await supabase.from("customers").insert({name});setBusy(false);if(error)setError(error.message);else{setNotice(w.saved);await refresh();}}
+  async function addRawMaterial(material:Omit<RawMaterial,"id">):Promise<boolean>{if(!supabase||!material.name.trim())return false;setBusy(true);setError("");const {error}=await supabase.from("raw_materials").insert(material);setBusy(false);if(error){setError(error.message);return false;}setNotice(w.saved);await refresh();return true;}
+  async function adjustRawMaterial(id:string,delta:number){if(!supabase||!Number.isFinite(delta)||delta===0)return;setBusy(true);setError("");const {error}=await supabase.rpc("adjust_raw_material",{p_material_id:id,p_delta:delta});setBusy(false);if(error){setError(error.message);return;}setNotice(w.saved);await refresh();}
+  async function deleteRawMaterial(material:RawMaterial){if(!supabase||!window.confirm(`Remove ${material.name} from inventory?`))return;setBusy(true);setError("");const {error}=await supabase.from("raw_materials").delete().eq("id",material.id);setBusy(false);if(error){setError(error.message);return;}setNotice(w.saved);await refresh();}
   const categories:Record<string,string>={snacks:lang==="ta"?"சிற்றுண்டி":"Snacks",sweets:lang==="ta"?"இனிப்புகள்":"Sweets",mixtures:lang==="ta"?"கலவை":"Mixtures",other:lang==="ta"?"மற்றவை":"Other"};
   const units:Record<string,string>={packets:lang==="ta"?"பொட்டலங்கள்":"packets",pieces:lang==="ta"?"துண்டுகள்":"pieces",kg:lang==="ta"?"கிலோ":"kg"};
   const status=(p:Product)=>Number(p.stock)<=0?w.outLabel:Number(p.stock)<=Number(p.low_stock_threshold)?w.lowLabel:w.inStockLabel;
@@ -82,6 +87,7 @@ export default function Home() {
   return <AppShell page={page} lang={lang} theme={theme} w={w} user={user} error={error} notice={notice} onPageChange={setPage} onToggleLanguage={toggleLanguage} onToggleTheme={toggleTheme} onSignOut={()=>void signOut()} onDismissError={()=>setError("")} onDismissNotice={()=>setNotice("")}>
       {page==="dashboard"&&<DashboardView w={w} lang={lang} sales={sales} recent={recent} products={products} lowProducts={lowProducts} categories={categories} units={units} loading={loading}/> }
       {page==="inventory"&&<InventoryView w={w} products={products} categories={categories} units={units} stockFilter={stockFilter} setStockFilter={setStockFilter} status={status} onAddProduct={()=>{setError("");setDialog("product");}} onRestock={(product)=>void restock(product)} loading={loading} lang={lang}/> }
+      {page==="rawMaterials"&&<RawMaterialsView materials={rawMaterials} w={w} busy={busy} onAdd={addRawMaterial} onAdjust={adjustRawMaterial} onDelete={deleteRawMaterial}/>}
       {page==="sales"&&<SalesView w={w} lang={lang} sales={sales} orders={orders} busy={busy} onRecordSale={()=>{setError("");setDialog("sale");}} onUpdatePayment={updateOrderPayment}/> }
       {page==="customers"&&<CustomersView w={w} lang={lang} sales={sales} orders={orders} customers={customers} selectedCustomer={filterCustomer} onCustomerChange={setFilterCustomer} from={from} to={to} onFromChange={setFrom} onToChange={setTo} onAddCustomer={addCustomer}/> }
       {page==="attendance"&&<AttendanceView employees={employees} attendance={attendance} payments={salaryPayments} date={attendanceDate} today={localDate()} busy={busy} onDateChange={setAttendanceDate} onAddEmployee={addEmployee} onDeleteEmployee={deleteEmployee} onSaveAttendance={saveAttendance} onMarkPaid={markSalaryPaid}/>}

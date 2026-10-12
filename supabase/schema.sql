@@ -266,3 +266,50 @@ create policy "Users manage their own salary payments" on public.salary_payments
 grant select, insert, update, delete on public.employees to authenticated;
 grant select, insert, update, delete on public.attendance to authenticated;
 grant select, insert, update, delete on public.salary_payments to authenticated;
+
+-- Raw materials used by the business (separate from finished product stock).
+create table if not exists public.raw_materials (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  name text not null check (char_length(trim(name)) between 1 and 120),
+  quantity numeric(12,3) not null default 0 check (quantity >= 0),
+  unit text not null check (unit in ('kg','units')),
+  low_stock_threshold numeric(12,3) not null default 5 check (low_stock_threshold >= 0),
+  check (unit = 'kg' or (quantity = trunc(quantity) and low_stock_threshold = trunc(low_stock_threshold))),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists raw_materials_owner_name_idx on public.raw_materials(owner_id, name);
+alter table public.raw_materials enable row level security;
+drop policy if exists "Users manage their own raw materials" on public.raw_materials;
+create policy "Users manage their own raw materials" on public.raw_materials
+  for all to authenticated using ((select auth.uid()) = owner_id)
+  with check ((select auth.uid()) = owner_id);
+grant select, insert, update, delete on public.raw_materials to authenticated;
+
+create or replace function public.adjust_raw_material(p_material_id uuid, p_delta numeric)
+returns numeric
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_owner uuid := auth.uid();
+  v_quantity numeric(12,3);
+  v_unit text;
+begin
+  if v_owner is null then raise exception 'Sign in to adjust raw material stock'; end if;
+  if p_delta is null or p_delta = 0 then raise exception 'Enter a quantity greater than zero'; end if;
+  select quantity, unit into v_quantity, v_unit from public.raw_materials
+    where id = p_material_id and owner_id = v_owner for update;
+  if not found then raise exception 'Raw material not found'; end if;
+  if v_unit = 'units' and p_delta <> trunc(p_delta) then raise exception 'Unit quantities must be whole numbers'; end if;
+  if v_quantity + p_delta < 0 then raise exception 'Used quantity cannot exceed available stock'; end if;
+  update public.raw_materials set quantity = quantity + p_delta
+    where id = p_material_id and owner_id = v_owner returning quantity into v_quantity;
+  return v_quantity;
+end;
+$$;
+
+revoke all on function public.adjust_raw_material(uuid, numeric) from public;
+grant execute on function public.adjust_raw_material(uuid, numeric) to authenticated;

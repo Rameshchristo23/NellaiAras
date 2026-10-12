@@ -13,6 +13,8 @@ Bilingual English and Tamil stock, sales, and customer-history app for a snacks 
 
 ## Data and access
 
-Products and sales are stored in Supabase Postgres. Row Level Security restricts each account to its own records. Sale recording and stock deduction happen together in a database function, so two sales cannot oversell the same stock. Restocking also uses a database function. Customer history is grouped from the customer names attached to sales; unnamed sales appear as “Walk-in customer.”
+Products, raw materials, and sales are stored in Supabase Postgres. Row Level Security restricts each account to its own records. The Inventory menu tracks raw materials in kilograms or whole units, with configurable low-stock reminders and add/use adjustments. Sale recording and finished-product stock deduction happen together in a database function, so two sales cannot oversell the same stock. Restocking and raw-material adjustments also use database functions.
 
 The app uses the Supabase publishable key in the browser. Do not put a Supabase secret or service-role key in `NEXT_PUBLIC_*` variables.
+
+If the app was already set up before raw-material inventory was added, run the updated `supabase/schema.sql` in the SQL Editor to create the raw-material table and adjustment function.
