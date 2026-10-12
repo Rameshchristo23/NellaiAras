@@ -45,7 +45,7 @@ export function RawMaterialsView({ materials, w, busy, onAdd, onAdjust, onDelete
     <div className="page-title"><div><h1>{w.materialsTitle}</h1><p>{w.materialsSub}</p></div><button className="primary" onClick={() => setAdding((value) => !value)}>{adding ? w.cancel : `＋ ${w.addMaterial}`}</button></div>
     <div className="metrics material-metrics"><div className="metric"><div className="metric-top">{w.material}</div><div className="metric-value">{materials.length}</div></div><div className="metric"><div className="metric-top">{w.lowMaterial}</div><div className="metric-value">{lowCount}</div></div></div>
     {adding && <Panel title={w.addMaterial}><form className="material-form" onSubmit={(event) => void submitMaterial(event)}>
-      <label>{w.materialName}<input name="name" required maxLength={120} placeholder="e.g. Sugar"/></label>
+      <label>{w.materialName}<input name="name" required maxLength={120} placeholder={w.sampleMaterial}/></label>
       <label>{w.unit}<select name="unit" value={newUnit} onChange={(event) => setNewUnit(event.target.value as RawMaterial["unit"])}><option value="kg">{w.unitKg}</option><option value="units">{w.unitUnits}</option></select></label>
       <label>{w.availableQuantity}<input name="quantity" type="number" min="0" step={newUnit === "units" ? "1" : "0.001"} required defaultValue="0"/></label>
       <label>{w.lowAt}<input name="threshold" type="number" min="0" step={newUnit === "units" ? "1" : "0.001"} required defaultValue="5"/></label>
