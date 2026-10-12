@@ -313,3 +313,145 @@ $$;
 
 revoke all on function public.adjust_raw_material(uuid, numeric) from public;
 grant execute on function public.adjust_raw_material(uuid, numeric) to authenticated;
+
+-- Shared public workspace: no sign-in is required, and every visitor uses the same records.
+-- Existing rows remain intact; owner_id is retained only for compatibility with older records.
+alter table public.products alter column owner_id drop not null;
+alter table public.sales alter column owner_id drop not null;
+alter table public.customer_orders alter column owner_id drop not null;
+alter table public.customers alter column owner_id drop not null;
+alter table public.employees alter column owner_id drop not null;
+alter table public.attendance alter column owner_id drop not null;
+alter table public.salary_payments alter column owner_id drop not null;
+alter table public.raw_materials alter column owner_id drop not null;
+
+alter table public.products disable row level security;
+alter table public.sales disable row level security;
+alter table public.customer_orders disable row level security;
+alter table public.customers disable row level security;
+alter table public.employees disable row level security;
+alter table public.attendance disable row level security;
+alter table public.salary_payments disable row level security;
+alter table public.raw_materials disable row level security;
+
+grant select, insert, update, delete on public.products to anon, authenticated;
+grant select, insert, update, delete on public.sales to anon, authenticated;
+grant select, insert, update, delete on public.customer_orders to anon, authenticated;
+grant select, insert, update, delete on public.customers to anon, authenticated;
+grant select, insert, update, delete on public.employees to anon, authenticated;
+grant select, insert, update, delete on public.attendance to anon, authenticated;
+grant select, insert, update, delete on public.salary_payments to anon, authenticated;
+grant select, insert, update, delete on public.raw_materials to anon, authenticated;
+
+create or replace function public.record_order(p_items jsonb, p_customer_name text default '', p_amount_paid numeric default 0)
+returns uuid
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_item record;
+  v_product record;
+  v_total numeric(14,2) := 0;
+  v_order_id uuid;
+begin
+  if p_items is null or jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then raise exception 'Add at least one product'; end if;
+  if p_amount_paid is null or p_amount_paid < 0 then raise exception 'Payment cannot be negative'; end if;
+
+  for v_item in select product_id, sum(quantity) as quantity
+    from jsonb_to_recordset(p_items) as x(product_id uuid, quantity numeric)
+    group by product_id
+  loop
+    if v_item.quantity <= 0 then raise exception 'Quantity must be greater than zero'; end if;
+    select id, name, price, stock into v_product from public.products
+      where id = v_item.product_id for update;
+    if not found then raise exception 'Product not found'; end if;
+    if v_product.stock < v_item.quantity then raise exception 'Not enough stock for %', v_product.name; end if;
+    v_total := v_total + round(v_product.price * v_item.quantity, 2);
+  end loop;
+  if p_amount_paid > v_total then raise exception 'Amount paid cannot exceed order total'; end if;
+
+  insert into public.customer_orders(customer_name, total, amount_paid)
+  values (coalesce(trim(p_customer_name), ''), v_total, p_amount_paid)
+  returning id into v_order_id;
+
+  for v_item in select product_id, sum(quantity) as quantity
+    from jsonb_to_recordset(p_items) as x(product_id uuid, quantity numeric)
+    group by product_id
+  loop
+    select name, price into v_product from public.products where id = v_item.product_id;
+    update public.products set stock = stock - v_item.quantity where id = v_item.product_id;
+    insert into public.sales(order_id, product_id, product_name, quantity, unit_price, customer_name)
+    values (v_order_id, v_item.product_id, v_product.name, v_item.quantity, v_product.price, coalesce(trim(p_customer_name), ''));
+  end loop;
+  return v_order_id;
+end;
+$$;
+
+create or replace function public.record_sale(p_product_id uuid, p_quantity numeric, p_customer_name text default '')
+returns uuid
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_name text;
+  v_price numeric(12,2);
+  v_stock numeric(12,3);
+  v_sale_id uuid;
+begin
+  if p_quantity is null or p_quantity <= 0 then raise exception 'Quantity must be greater than zero'; end if;
+  select name, price, stock into v_name, v_price, v_stock from public.products where id = p_product_id for update;
+  if not found then raise exception 'Product not found'; end if;
+  if v_stock < p_quantity then raise exception 'Not enough stock'; end if;
+  update public.products set stock = stock - p_quantity where id = p_product_id;
+  insert into public.sales(product_id, product_name, quantity, unit_price, customer_name)
+  values (p_product_id, v_name, p_quantity, v_price, coalesce(trim(p_customer_name), '')) returning id into v_sale_id;
+  return v_sale_id;
+end;
+$$;
+
+create or replace function public.restock_product(p_product_id uuid, p_quantity numeric)
+returns numeric
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_stock numeric(12,3);
+begin
+  if p_quantity is null or p_quantity <= 0 then raise exception 'Restock quantity must be greater than zero'; end if;
+  update public.products set stock = stock + p_quantity where id = p_product_id returning stock into v_stock;
+  if not found then raise exception 'Product not found'; end if;
+  return v_stock;
+end;
+$$;
+
+create or replace function public.adjust_raw_material(p_material_id uuid, p_delta numeric)
+returns numeric
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_quantity numeric(12,3);
+  v_unit text;
+begin
+  if p_delta is null or p_delta = 0 then raise exception 'Enter a quantity greater than zero'; end if;
+  select quantity, unit into v_quantity, v_unit from public.raw_materials where id = p_material_id for update;
+  if not found then raise exception 'Raw material not found'; end if;
+  if v_unit = 'units' and p_delta <> trunc(p_delta) then raise exception 'Unit quantities must be whole numbers'; end if;
+  if v_quantity + p_delta < 0 then raise exception 'Used quantity cannot exceed available stock'; end if;
+  update public.raw_materials set quantity = quantity + p_delta where id = p_material_id returning quantity into v_quantity;
+  return v_quantity;
+end;
+$$;
+
+revoke all on function public.record_sale(uuid, numeric, text) from public;
+revoke all on function public.record_order(jsonb, text, numeric) from public;
+revoke all on function public.restock_product(uuid, numeric) from public;
+revoke all on function public.adjust_raw_material(uuid, numeric) from public;
+grant execute on function public.record_sale(uuid, numeric, text) to anon, authenticated;
+grant execute on function public.record_order(jsonb, text, numeric) to anon, authenticated;
+grant execute on function public.restock_product(uuid, numeric) to anon, authenticated;
+grant execute on function public.adjust_raw_material(uuid, numeric) to anon, authenticated;

@@ -9,13 +9,11 @@ type AppShellProps = {
   lang: Language;
   theme: "light" | "dark";
   w: AppCopy;
-  user: string;
   error: string;
   notice: string;
   onPageChange: (page: AppPage) => void;
   onToggleLanguage: () => void;
   onToggleTheme: () => void;
-  onSignOut: () => void;
   onDismissError: () => void;
   onDismissNotice: () => void;
 };
@@ -39,15 +37,15 @@ function Brand({ compact = false }: { compact?: boolean }) {
   return <span className={`brand-mark${compact ? " compact" : ""}`}><img src="/apple-touch-icon.png" alt=""/><span className="sr-only">Nellai ARAS</span></span>;
 }
 
-export function AppShell({ children, page, lang, theme, w, user, error, notice, onPageChange, onToggleLanguage, onToggleTheme, onSignOut, onDismissError, onDismissNotice }: AppShellProps) {
+export function AppShell({ children, page, lang, theme, w, error, notice, onPageChange, onToggleLanguage, onToggleTheme, onDismissError, onDismissNotice }: AppShellProps) {
   return <div className="app-shell">
     <aside className="sidebar">
       <div className="brand"><Brand/><div><b>Nellai ARAS</b><small>SNACKS BUSINESS MANAGER</small></div></div>
       <div className="nav-label">{lang === "ta" ? "பட்டியல்" : "MENU"}</div>
       <nav aria-label={lang === "ta" ? "முதன்மை வழிசெலுத்தல்" : "Main navigation"}>{pages.map((item) => <button key={item} onClick={() => onPageChange(item)} className={page === item ? "selected" : ""} aria-current={page === item ? "page" : undefined}><NavIcon page={item}/>{w[item]}</button>)}</nav>
-      <div className="sidebar-foot"><div className="help-card">{lang === "ta" ? "குறைந்த சரக்கைக் கவனித்து வாடிக்கையாளர்களை மகிழ்விக்கவும்." : "Keep an eye on low stock to keep every customer happy."}</div><div className="user-row"><span className="avatar" aria-hidden="true">👩🏽‍🍳</span><div className="user-email" title={user}>{user.slice(0, 8)}…</div><button className="signout" onClick={onSignOut}>{w.signOut}</button></div></div>
+      <div className="sidebar-foot"><div className="help-card">{lang === "ta" ? "குறைந்த சரக்கைக் கவனித்து வாடிக்கையாளர்களை மகிழ்விக்கவும்." : "Keep an eye on low stock to keep every customer happy."}</div><div className="shared-workspace">{lang === "ta" ? "அனைவருக்கும் பொதுவான வணிகத் தரவு" : "Shared business workspace"}</div></div>
     </aside>
-    <main className="main"><header className="topbar"><div className="crumb"><Brand compact/><b className="topbar-brand">Nellai ARAS</b><span className="crumb-separator">/</span><span className="current-page">{w[page]}</span></div><div className="top-actions"><InstallAppButton/><button className="theme-btn" onClick={onToggleTheme} aria-label={theme === "light" ? "Switch to dark theme" : "Switch to light theme"} title={theme === "light" ? "Dark theme" : "Light theme"}>{theme === "light" ? "◐" : "☀"}<span>{lang === "ta" ? (theme === "light" ? "இருள்" : "ஒளி") : (theme === "light" ? "Dark" : "Light")}</span></button><button className="lang-btn" onClick={onToggleLanguage}>{lang === "en" ? "தமிழ்" : "English"}</button><button className="signout desktop-signout" onClick={onSignOut}>{w.signOut}</button></div></header>
+    <main className="main"><header className="topbar"><div className="crumb"><Brand compact/><b className="topbar-brand">Nellai ARAS</b><span className="crumb-separator">/</span><span className="current-page">{w[page]}</span></div><div className="top-actions"><InstallAppButton/><button className="theme-btn" onClick={onToggleTheme} aria-label={theme === "light" ? "Switch to dark theme" : "Switch to light theme"} title={theme === "light" ? "Dark theme" : "Light theme"}>{theme === "light" ? "◐" : "☀"}<span>{lang === "ta" ? (theme === "light" ? "இருள்" : "ஒளி") : (theme === "light" ? "Dark" : "Light")}</span></button><button className="lang-btn" onClick={onToggleLanguage}>{lang === "en" ? "தமிழ்" : "English"}</button></div></header>
       <div className="content">{error && <div className="error global-error" role="alert">{error}<button onClick={onDismissError} aria-label="Dismiss error">×</button></div>}{notice && <div className="notice global-notice" role="status">{notice}<button onClick={onDismissNotice} aria-label="Dismiss notice">×</button></div>}{children}</div>
     </main>
     <nav className="mobile-bottom-nav" aria-label={lang === "ta" ? "முதன்மை வழிசெலுத்தல்" : "Main navigation"}>{pages.map((item) => <button key={item} onClick={() => onPageChange(item)} className={page === item ? "selected" : ""} aria-current={page === item ? "page" : undefined}><NavIcon page={item}/><span>{w[item]}</span></button>)}</nav>

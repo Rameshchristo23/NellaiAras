@@ -134,7 +134,7 @@ html,body{min-height:100%;transition:background-color .22s ease,color .22s ease}
 @media(max-width:760px){.topbar{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}.top-actions{gap:5px}.install-btn{padding:8px;font-size:10px}.theme-btn{min-width:0;padding:8px}}
 
 /* Nellai ARAS purple palette from the supplied light and dark theme reference. */
-:root{color-scheme:light;--ink:#3b2fd0;--muted:#6b5ce7;--paper:#f5f7ff;--white:#fff;--line:#e0e7ff;--green:#7e6ff5;--green2:#8b5cf6;--red:#f59e0b;--shadow:0 10px 28px #3526a510}
+:root{color-scheme:light;--ink:#2a2843;--muted:#6b64ab;--paper:#f5f7ff;--white:#fff;--line:#e0e7ff;--green:#7e6ff5;--green2:#8b5cf6;--red:#f59e0b;--shadow:0 10px 28px #3526a510}
 :root[data-theme="dark"]{color-scheme:dark;--ink:#ede9ff;--muted:#c7cff9;--paper:#0b1020;--white:#121a2f;--line:#2a3553;--green:#7e6ff5;--green2:#a855f7;--red:#f59e0b;--shadow:0 12px 32px #02061770}
 body{background:radial-gradient(ellipse at 82% -12%,#e6eaff 0%,transparent 44%),var(--paper);color:var(--ink)}
 :root[data-theme="dark"] body{background:radial-gradient(ellipse at 82% -12%,#182344 0%,transparent 44%),var(--paper);color:var(--ink)}
@@ -184,3 +184,25 @@ body{background:radial-gradient(ellipse at 82% -12%,#e6eaff 0%,transparent 44%),
 :root[data-theme="dark"] .notice{background:#173526;color:#7ee0a1}
 :root[data-theme="dark"] .modal-backdrop{background:#030615bb}
 :root[data-theme="dark"] .attendance-grid th:first-child,:root[data-theme="dark"] .attendance-grid td:first-child{background:var(--white)}
+.shared-workspace{border-top:1px solid var(--line);padding:13px 4px 0;color:var(--muted);font-size:10px;font-weight:600}
+@media(max-width:760px){
+  .material-list{grid-template-columns:minmax(0,1fr);gap:10px}
+  .material-list>.panel{margin-bottom:0}
+  .material-card-head{align-items:center;gap:10px}
+  .material-card-head>div{min-width:0}
+  .material-card-head h2{overflow-wrap:anywhere}
+  .material-card-head .badge{flex:0 0 auto;white-space:nowrap}
+  .material-quantity{padding:13px 0;margin-bottom:12px}
+  .material-actions{grid-template-columns:minmax(68px,.9fr) minmax(0,1fr) minmax(0,1fr);gap:7px;align-items:end}
+  .material-actions .action{min-width:0;padding:7px 4px;font-size:9px}
+  .material-actions .material-remove{grid-column:1/-1;justify-self:end;width:auto;min-height:30px;padding:4px 2px;margin-top:1px}
+  .material-form{gap:10px}
+}
+@media(max-width:360px){
+  .material-actions{grid-template-columns:minmax(60px,.8fr) minmax(0,1fr) minmax(0,1fr);gap:5px}
+  .material-actions .action{font-size:8px;padding:6px 3px}
+  .material-card-head h2{font-size:14px}
+  .material-card-head .badge{font-size:8px;padding:4px 6px}
+  .material-form{grid-template-columns:minmax(0,1fr)}
+  .material-form .primary{grid-column:auto}
+}

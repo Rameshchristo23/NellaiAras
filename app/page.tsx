@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { getSupabase } from "@/lib/supabase";
 import { AppShell } from "@/components/AppShell";
-import { AuthScreen } from "@/components/AuthScreen";
 import { ProductSaleDialog } from "@/components/ProductSaleDialog";
 import { words } from "@/lib/i18n";
 import { DashboardView } from "@/components/views/DashboardView";
@@ -24,12 +23,10 @@ export default function Home() {
   const [theme, setTheme] = useState<"light"|"dark">("light");
   const [page, setPage] = useState<Page>("dashboard");
   const [supabase, setSupabase] = useState<ReturnType<typeof getSupabase>>(null);
-  const [user, setUser] = useState<string|null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [isSignup, setIsSignup] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
@@ -46,23 +43,21 @@ export default function Home() {
   const [dialog, setDialog] = useState<"product"|"sale"|null>(null);
   const w = words[lang];
 
-  useEffect(() => { setLang(localStorage.getItem("ml_lang") === "ta" ? "ta" : "en"); const savedTheme=localStorage.getItem("ml_theme");if(savedTheme==="dark"||savedTheme==="light"){setTheme(savedTheme);document.documentElement.dataset.theme=savedTheme;} const db=getSupabase(); setSupabase(db); if(!db){setLoading(false);return;} db.auth.getUser().then(({data})=>{setUser(data.user?.id??null);if(!data.user)setLoading(false);}); const {data:{subscription}}=db.auth.onAuthStateChange((_event,session)=>{setUser(session?.user.id??null);if(!session?.user)setLoading(false);}); return()=>subscription.unsubscribe(); },[]);
+  useEffect(() => { setLang(localStorage.getItem("ml_lang") === "ta" ? "ta" : "en"); const savedTheme=localStorage.getItem("ml_theme");if(savedTheme==="dark"||savedTheme==="light"){setTheme(savedTheme);document.documentElement.dataset.theme=savedTheme;} const db=getSupabase(); setSupabase(db); if(!db)setLoading(false); },[]);
 
   const refresh = useCallback(async () => {
-    if(!supabase||!user)return;
+    if(!supabase)return;
     setLoading(true);setError("");
     const month=attendanceDate.slice(0,7), monthEnd=`${month}-${String(new Date(Number(month.slice(0,4)),Number(month.slice(5,7)),0).getDate()).padStart(2,"0")}`, attendanceEnd=month===localDate().slice(0,7)?localDate():monthEnd;
     const [p,s,o,c,e,a,pay,m]=await Promise.all([supabase.from("products").select("id,name,category,stock,unit,price,low_stock_threshold").order("name"),supabase.from("sales").select("id,product_id,product_name,quantity,unit_price,total,customer_name,created_at,order_id").order("created_at",{ascending:false}),supabase.from("customer_orders").select("id,customer_name,total,amount_paid,created_at").order("created_at",{ascending:false}),supabase.from("customers").select("id,name").order("name"),supabase.from("employees").select("id,name,daily_wage,active").order("name"),supabase.from("attendance").select("id,employee_id,work_date,status").gte("work_date",`${month}-01`).lte("work_date",attendanceEnd),supabase.from("salary_payments").select("id,employee_id,work_month,amount,paid_at").eq("work_month",`${month}-01`),supabase.from("raw_materials").select("id,name,quantity,unit,low_stock_threshold").order("name")]);
     if(p.error||s.error||o.error||c.error||e.error||a.error||pay.error||m.error)setError((p.error||s.error||o.error||c.error||e.error||a.error||pay.error||m.error)?.message||"Could not load data.");else{setProducts((p.data||[]) as Product[]);setSales((s.data||[]) as Sale[]);setOrders((o.data||[]) as CustomerOrder[]);setSavedCustomers((c.data||[]) as Customer[]);setEmployees((e.data||[]) as Employee[]);setAttendance((a.data||[]) as Attendance[]);setSalaryPayments((pay.data||[]) as SalaryPayment[]);setRawMaterials((m.data||[]) as RawMaterial[]);}setLoading(false);
-  },[supabase,user,attendanceDate]);
+  },[supabase,attendanceDate]);
   useEffect(()=>{void refresh();},[refresh]);
 
   const customers=useMemo(()=>{const map=new Map<string,string>();sales.forEach(s=>{const n=s.customer_name.trim();if(n)map.set(n.toLocaleLowerCase(),n);});savedCustomers.forEach(c=>map.set(c.name.toLocaleLowerCase(),c.name));return [...map.entries()].sort((a,b)=>a[1].localeCompare(b[1]));},[sales,savedCustomers]);
   const lowProducts=products.filter(p=>Number(p.stock)<=Number(p.low_stock_threshold));
   const recent=sales.slice(0,6);
 
-  async function authenticate(e:FormEvent<HTMLFormElement>){e.preventDefault();if(!supabase)return;setBusy(true);setError("");const fd=new FormData(e.currentTarget),email=String(fd.get("email")),password=String(fd.get("password"));const result=isSignup?await supabase.auth.signUp({email,password}):await supabase.auth.signInWithPassword({email,password});setBusy(false);if(result.error){setError(result.error.message);return;}if(isSignup&&!result.data.session){setNotice(w.signUpSuccess);setIsSignup(false);}else setUser(result.data.user?.id??null);}
-  async function signOut(){await supabase?.auth.signOut();setProducts([]);setSales([]);setUser(null);}
   function toggleLanguage(){const next=lang==="en"?"ta":"en";setLang(next);localStorage.setItem("ml_lang",next);}
   function toggleTheme(){const next=theme==="light"?"dark":"light";setTheme(next);document.documentElement.dataset.theme=next;localStorage.setItem("ml_theme",next);}
   async function addProduct(e:FormEvent<HTMLFormElement>){e.preventDefault();if(!supabase)return;setBusy(true);setError("");const fd=new FormData(e.currentTarget),payload={name:String(fd.get("name")).trim(),category:String(fd.get("category")),stock:Number(fd.get("stock")),unit:String(fd.get("unit")),price:Number(fd.get("price")),low_stock_threshold:Number(fd.get("threshold"))};const {error}=await supabase.from("products").insert(payload);setBusy(false);if(error){setError(error.message);return;}setDialog(null);setNotice(w.saved);await refresh();}
@@ -82,9 +77,7 @@ export default function Home() {
   const status=(p:Product)=>Number(p.stock)<=0?w.outLabel:Number(p.stock)<=Number(p.low_stock_threshold)?w.lowLabel:w.inStockLabel;
 
   if(!supabase)return <main className="center-screen"><section className="auth-card"><div className="logo">🥨</div><h1>{w.configTitle}</h1><p>{w.configText}</p><p className="muted">{w.schemaHint}</p><code>cp .env.example .env.local</code></section></main>;
-  if(!user)return <AuthScreen lang={lang} theme={theme} w={w} busy={busy} error={error} notice={notice} isSignup={isSignup} onSubmit={authenticate} onToggleSignup={()=>{setIsSignup(!isSignup);setError("");}} onToggleLanguage={toggleLanguage} onToggleTheme={toggleTheme}/>;
-
-  return <AppShell page={page} lang={lang} theme={theme} w={w} user={user} error={error} notice={notice} onPageChange={setPage} onToggleLanguage={toggleLanguage} onToggleTheme={toggleTheme} onSignOut={()=>void signOut()} onDismissError={()=>setError("")} onDismissNotice={()=>setNotice("")}>
+  return <AppShell page={page} lang={lang} theme={theme} w={w} error={error} notice={notice} onPageChange={setPage} onToggleLanguage={toggleLanguage} onToggleTheme={toggleTheme} onDismissError={()=>setError("")} onDismissNotice={()=>setNotice("")}>
       {page==="dashboard"&&<DashboardView w={w} lang={lang} sales={sales} recent={recent} products={products} lowProducts={lowProducts} categories={categories} units={units} loading={loading}/> }
       {page==="inventory"&&<InventoryView w={w} products={products} categories={categories} units={units} stockFilter={stockFilter} setStockFilter={setStockFilter} status={status} onAddProduct={()=>{setError("");setDialog("product");}} onRestock={(product)=>void restock(product)} loading={loading} lang={lang}/> }
       {page==="rawMaterials"&&<RawMaterialsView materials={rawMaterials} w={w} busy={busy} onAdd={addRawMaterial} onAdjust={adjustRawMaterial} onDelete={deleteRawMaterial}/>}
