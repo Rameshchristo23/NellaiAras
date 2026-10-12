@@ -8,9 +8,11 @@ create table if not exists public.products (
   unit text not null default 'packets' check (unit in ('packets','pieces','kg')),
   price numeric(12,2) not null check (price >= 0),
   low_stock_threshold numeric(12,3) not null default 10 check (low_stock_threshold >= 0),
+  active boolean not null default true,
   created_at timestamptz not null default now(),
   unique (id, owner_id)
 );
+alter table public.products add column if not exists active boolean not null default true;
 
 create table if not exists public.sales (
   id uuid primary key default gen_random_uuid(),
@@ -364,7 +366,7 @@ begin
   loop
     if v_item.quantity <= 0 then raise exception 'Quantity must be greater than zero'; end if;
     select id, name, price, stock into v_product from public.products
-      where id = v_item.product_id for update;
+      where id = v_item.product_id and active for update;
     if not found then raise exception 'Product not found'; end if;
     if v_product.stock < v_item.quantity then raise exception 'Not enough stock for %', v_product.name; end if;
     v_total := v_total + round(v_product.price * v_item.quantity, 2);
@@ -379,7 +381,7 @@ begin
     from jsonb_to_recordset(p_items) as x(product_id uuid, quantity numeric)
     group by product_id
   loop
-    select name, price into v_product from public.products where id = v_item.product_id;
+    select name, price into v_product from public.products where id = v_item.product_id and active;
     update public.products set stock = stock - v_item.quantity where id = v_item.product_id;
     insert into public.sales(order_id, product_id, product_name, quantity, unit_price, customer_name)
     values (v_order_id, v_item.product_id, v_product.name, v_item.quantity, v_product.price, coalesce(trim(p_customer_name), ''));
@@ -401,10 +403,10 @@ declare
   v_sale_id uuid;
 begin
   if p_quantity is null or p_quantity <= 0 then raise exception 'Quantity must be greater than zero'; end if;
-  select name, price, stock into v_name, v_price, v_stock from public.products where id = p_product_id for update;
+  select name, price, stock into v_name, v_price, v_stock from public.products where id = p_product_id and active for update;
   if not found then raise exception 'Product not found'; end if;
   if v_stock < p_quantity then raise exception 'Not enough stock'; end if;
-  update public.products set stock = stock - p_quantity where id = p_product_id;
+  update public.products set stock = stock - p_quantity where id = p_product_id and active;
   insert into public.sales(product_id, product_name, quantity, unit_price, customer_name)
   values (p_product_id, v_name, p_quantity, v_price, coalesce(trim(p_customer_name), '')) returning id into v_sale_id;
   return v_sale_id;
@@ -421,7 +423,7 @@ declare
   v_stock numeric(12,3);
 begin
   if p_quantity is null or p_quantity <= 0 then raise exception 'Restock quantity must be greater than zero'; end if;
-  update public.products set stock = stock + p_quantity where id = p_product_id returning stock into v_stock;
+  update public.products set stock = stock + p_quantity where id = p_product_id and active returning stock into v_stock;
   if not found then raise exception 'Product not found'; end if;
   return v_stock;
 end;
@@ -455,3 +457,48 @@ grant execute on function public.record_sale(uuid, numeric, text) to anon, authe
 grant execute on function public.record_order(jsonb, text, numeric) to anon, authenticated;
 grant execute on function public.restock_product(uuid, numeric) to anon, authenticated;
 grant execute on function public.adjust_raw_material(uuid, numeric) to anon, authenticated;
+
+create or replace function public.rename_customer(p_customer_id uuid, p_name text)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_old_name text;
+  v_new_name text := trim(coalesce(p_name, ''));
+begin
+  if char_length(v_new_name) not between 1 and 120 then raise exception 'Customer name must be between 1 and 120 characters'; end if;
+  select name into v_old_name from public.customers where id = p_customer_id for update;
+  if not found then raise exception 'Customer not found'; end if;
+  if exists (select 1 from public.customers where id <> p_customer_id and lower(name) = lower(v_new_name)) then
+    raise exception 'That customer already exists';
+  end if;
+  update public.customers set name = v_new_name where id = p_customer_id;
+  update public.customer_orders set customer_name = v_new_name where customer_name = v_old_name;
+  update public.sales set customer_name = v_new_name where customer_name = v_old_name;
+end;
+$$;
+
+revoke all on function public.rename_customer(uuid, text) from public;
+grant execute on function public.rename_customer(uuid, text) to anon, authenticated;
+
+create or replace function public.remove_customer(p_customer_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_name text;
+begin
+  select name into v_name from public.customers where id = p_customer_id for update;
+  if not found then raise exception 'Customer not found'; end if;
+  delete from public.customers where id = p_customer_id;
+  update public.customer_orders set customer_name = '' where customer_name = v_name;
+  update public.sales set customer_name = '' where customer_name = v_name;
+end;
+$$;
+
+revoke all on function public.remove_customer(uuid) from public;
+grant execute on function public.remove_customer(uuid) to anon, authenticated;

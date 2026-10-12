@@ -185,6 +185,14 @@ body{background:radial-gradient(ellipse at 82% -12%,#e6eaff 0%,transparent 44%),
 :root[data-theme="dark"] .modal-backdrop{background:#030615bb}
 :root[data-theme="dark"] .attendance-grid th:first-child,:root[data-theme="dark"] .attendance-grid td:first-child{background:var(--white)}
 .shared-workspace{border-top:1px solid var(--line);padding:13px 4px 0;color:var(--muted);font-size:10px;font-weight:600}
+.row-actions,.employee-actions{display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap}
+.row-actions .action,.employee-actions .action{font-size:9px;padding:5px 7px}
+.danger-action{color:var(--red)!important}
+.customer-group-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:230px}
+.customer-group-meta>span:first-child{min-width:0;overflow-wrap:anywhere}
+.employee-actions{gap:4px}
+.employee-column{min-width:135px}
+:root[data-theme="dark"] .danger-action{color:#ffc44d!important}
 @media(max-width:760px){
   .material-list{grid-template-columns:minmax(0,1fr);gap:10px}
   .material-list>.panel{margin-bottom:0}
